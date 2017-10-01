@@ -9,6 +9,7 @@ import json
 from time import time
 from textwrap import dedent
 from uuid import uuid4
+from urllib.parse import urlparse
 
 from flask import Flask, jsonify, request
 
@@ -17,9 +18,21 @@ class Blockchain(object):
     def __init__(self):
         self.chain = []
         self.current_transactions = []
+        self.nodes = set()
 
         # creates the genisis block
         self.new_block(previous_hash=1, proof=100)
+
+    def register_node(self, address):
+        """
+        Add a new node to the list of nodes
+
+        :param address: <str> address of node
+        :return: none
+        """
+
+        parsed_url = urlparse(address)
+        self.nodes.add(parsed_url.netloc)
 
     def new_block(self, proof, previous_hash=None):
         """
@@ -78,6 +91,69 @@ class Blockchain(object):
             proof += 1
 
         return proof
+
+    def valid_chain(self, chain):
+        """
+        Determine if a given blockchain is valid
+
+        :param chain: <list> blockchain
+        :return: <bool> True if valid, False if not
+        """
+
+        last_block = chain[0]
+        current_index = 1
+
+        while current_index < len(chain):
+            block = chain[current_index]
+            print(f'{last_block}')
+            print(f'{block}')
+            print("\n------------\n")
+            #check hash of blocks is correct
+            if block['previous_hash'] != self.hash(last_block):
+                return False
+
+            #check for valid PoW
+            if not self.valid_proof(last_block['proof'], block['proof']):
+                return False
+
+            last_block = block
+            current_index += 1
+
+        return True
+
+    def resolve_conflicts(self):
+        """
+        Consensus Algorithm, resolves conflicts by replacing
+         the chain with the longest one in the network
+
+         :return: <bool> True if our chain was replaced, False if not
+        """
+
+        neighbors = self.nodes
+        new_chain = None
+
+        #looking for chains longer than current
+        max_length = len(self.chain)
+
+        #get all chains from network
+        for node in neighbors:
+            response = requests.get(f'http://{node}/chain')
+
+            if response.status_code == 200:
+                length = response.json()['length']
+                chain = response.json()['chain']
+
+                #check for longer/ valid chain
+                if length > max_length and self.valid_chain(chain):
+                    max_length = length
+                    new_chain = chain
+
+        #replace current instantiations chain with new chain if a longer one is discovered
+        if new_chain:
+            self.chain = new_chain
+            return True
+
+        return False
 
     @property
     def last_block(self):
@@ -170,7 +246,7 @@ def new_transaction():
 def full_chain():
     response = {
         'chain': blockchain.chain,
-        'length': len(blockchain.chain),
+      `  'length': len(blockchain.chain),
     }
     return jsonify(response), 200
 
