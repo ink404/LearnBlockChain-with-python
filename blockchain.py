@@ -7,6 +7,10 @@ https://hackernoon.com/learn-blockchains-by-building-one-117428612f46
 import hashlib
 import json
 from time import time
+from textwrap import dedent
+from uuid import uuid4
+
+from flask import Flask
 
 
 class Blockchain(object):
@@ -106,3 +110,30 @@ class Blockchain(object):
         guess = f'{last_proof}{proof}'.encode()
         guess_hash = hashlib.sha256(guess).hexdigest()
         return guess_hash[:4] == "0000"
+
+#Node instantiation
+app = Flask(__name__)
+
+#generate unique node address
+node_identifier = str(uuid4()).replace('-','')
+
+#Blockchain instantiation
+blockchain = Blockchain()
+
+@app.route('/mine', methods=['GET'])
+def min():
+    return "Mining a new block"
+
+@app.route('/transactions/new', methods['POST'])
+def new_transaction():
+    return "Adding a new transaction"
+
+@app.route('/chain', methods=['GET'])
+def full_chain():
+    response = {
+        'chain': blockchain.chain,
+        'length': len(blockchain.chain),
+    }
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
