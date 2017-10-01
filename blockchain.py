@@ -10,7 +10,7 @@ from time import time
 from textwrap import dedent
 from uuid import uuid4
 
-from flask import Flask
+from flask import Flask, jsonify, request
 
 
 class Blockchain(object):
@@ -92,11 +92,10 @@ class Blockchain(object):
         :return: <str>
         """
 
-        #The dictionary must be ordered or there will be inconsistent hashes
-        block_string =  json.dumps(block, sort_keys=True).encode()
+        # The dictionary must be ordered or there will be inconsistent hashes
+        block_string = json.dumps(block, sort_keys=True).encode()
         return hashlib.sha256(block_string).hexdigest()
 
-    
     @staticmethod
     def valid_proof(last_proof, proof):
         """
@@ -111,22 +110,38 @@ class Blockchain(object):
         guess_hash = hashlib.sha256(guess).hexdigest()
         return guess_hash[:4] == "0000"
 
-#Node instantiation
+
+# Node instantiation
 app = Flask(__name__)
 
-#generate unique node address
-node_identifier = str(uuid4()).replace('-','')
+# generate unique node address
+node_identifier = str(uuid4()).replace('-', '')
 
-#Blockchain instantiation
+# Blockchain instantiation
 blockchain = Blockchain()
+
 
 @app.route('/mine', methods=['GET'])
 def min():
     return "Mining a new block"
 
+
 @app.route('/transactions/new', methods['POST'])
 def new_transaction():
-    return "Adding a new transaction"
+    values = request.get_json()
+
+    # check for required fields in data
+    required = ['sender', 'recipient', 'amount']
+    if not all(k in values for k in required):
+        return 'Missing values', 400
+
+    # creating new transaction
+    index = blockchain.new_transaction(
+        values['sender'], values['recipient'], values['amount'])
+
+    response = {'message': f'Transaction will be added to Block {index}'}
+    return jsonify(response), 201
+
 
 @app.route('/chain', methods=['GET'])
 def full_chain():
@@ -134,6 +149,7 @@ def full_chain():
         'chain': blockchain.chain,
         'length': len(blockchain.chain),
     }
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
